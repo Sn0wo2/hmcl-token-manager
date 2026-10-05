@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	if err := cli.Run(filepath.Join(os.Getenv("APPDATA"), ".hmcl", "private", "user-account-private-data.json")); err != nil {
+	if err := cli.Run(filepath.Join(os.Getenv("APPDATA"), ".hmcl")); err != nil {
 		caelum.New(caelum.Config{
 			Targets: []caelum.Target{{Writer: os.Stderr}},
 		}).Error("HMCL Token Manager failed", "error", err)

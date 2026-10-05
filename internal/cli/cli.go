@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"charm.land/huh/v2"
@@ -13,7 +14,7 @@ import (
 )
 
 func Run(path string) error {
-	store, err := account.Load(path)
+	store, err := account.Load(filepath.Join(path, "private", "user-account-private-data.json"))
 	if err != nil {
 		return err
 	}
@@ -77,7 +78,7 @@ func Run(path string) error {
 			return err
 		}
 
-		encoded, err := utils.Encrypt(store.Accounts[selected], password)
+		encoded, err := utils.Crypto{}.Encrypt(store.Accounts[selected], password)
 		if err != nil {
 			return err
 		}
@@ -91,24 +92,53 @@ func Run(path string) error {
 			Next(true).
 			NextLabel("Done").
 			Run()
-
 	case "import":
 		var encoded string
-		if err := huh.NewText().
-			Title("Import account").
-			Description("Paste the encrypted HMCL account data").
-			Lines(6).
-			Validate(func(value string) error {
-				if strings.TrimSpace(value) == "" {
-					return errors.New("data cannot be empty")
-				}
-				return nil
-			}).
-			Value(&encoded).
-			Run(); err != nil {
-			return err
-		}
+	
+		if value, err := clipboard.ReadAll(); err == nil {
+			value = strings.TrimSpace(value)
 
+			if value != "" {
+				preview := value
+				if len(preview) > 64 {
+					preview = preview[:64] + "..."
+				}
+				var useClipboard bool
+				if err := huh.NewConfirm().
+					Title("Use clipboard data?").
+					Description(preview).
+					Affirmative("Use").
+					Negative("Paste manually").
+					Value(&useClipboard).
+					Run(); err != nil {
+					return err
+				}
+	
+				if useClipboard {
+					encoded = value
+				}
+			}
+		}
+	
+		if encoded == "" {
+			if err := huh.NewText().
+				Title("Import account").
+				Description("Paste the encrypted HMCL account data").
+				Lines(6).
+				Validate(func(value string) error {
+					if strings.TrimSpace(value) == "" {
+						return errors.New("data cannot be empty")
+					}
+					return nil
+				}).
+				Value(&encoded).
+				Run(); err != nil {
+				return err
+			}
+		}
+	
+		encoded = strings.TrimSpace(encoded)
+	
 		var password string
 		if err := huh.NewInput().
 			Title("Decryption password").
@@ -123,19 +153,22 @@ func Run(path string) error {
 			Run(); err != nil {
 			return err
 		}
-
-		acc, err := utils.Decrypt(encoded, password)
+	
+		acc, err := utils.Crypto{}.Decrypt[account.Account](encoded, password)
 		if err != nil {
 			return err
 		}
+	
 		added, err := store.Import(acc)
 		if err != nil {
 			return err
 		}
+	
 		status := "Updated"
 		if added {
 			status = "Added"
 		}
+	
 		return huh.NewNote().
 			Title("Import complete").
 			Description(fmt.Sprintf("%s %s\n\n%s", status, acc.PrivateData.ProfileName, path)).

@@ -1,100 +1,143 @@
 package utils
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
+	"errors"
 	"fmt"
-	"strings"
 
-	"github.com/Sn0wo2/hmcl-token-manager/internal/account"
+	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/crypto/scrypt"
 )
 
-func Encrypt(acc account.Account, password string) (string, error) {
-	plain, err := json.Marshal(acc)
+const (
+	// 别改长度
+	magicHead = "HMCLTM2"
+
+	saltSize  = 16
+	keySize   = 16
+	nonceSize = 12
+	tagSize   = 12
+)
+
+type Crypto struct{}
+
+func (Crypto) Encrypt[T any](v T, password string) (string, error) {
+	plain, err := msgpack.Marshal(v)
 	if err != nil {
-		return "", fmt.Errorf("marshal account: %w", err)
+		return "", err
 	}
 
-	salt := make([]byte, 16)
+	salt := make([]byte, saltSize)
 	if _, err := rand.Read(salt); err != nil {
-		return "", fmt.Errorf("read salt: %w", err)
+		return "", err
 	}
 
-	key, err := scrypt.Key([]byte(password), salt, 1<<15, 8, 1, 32)
+	material, err := scrypt.Key(
+		[]byte(password),
+		salt,
+		1<<15,
+		8,
+		1,
+		keySize+nonceSize,
+	)
 	if err != nil {
-		return "", fmt.Errorf("derive key: %w", err)
+		return "", err
 	}
 
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(material[:keySize])
 	if err != nil {
-		return "", fmt.Errorf("new cipher: %w", err)
+		return "", err
 	}
 
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := cipher.NewGCMWithTagSize(block, tagSize)
 	if err != nil {
-		return "", fmt.Errorf("new gcm: %w", err)
+		return "", err
 	}
 
-	nonce := make([]byte, gcm.NonceSize())
-	if _, err := rand.Read(nonce); err != nil {
-		return "", fmt.Errorf("read nonce: %w", err)
-	}
+	ciphertext := gcm.Seal(
+		nil,
+		material[keySize:],
+		plain,
+		nil,
+	)
 
-	ciphertext := gcm.Seal(nil, nonce, plain, nil)
+	payload := make([]byte, len(magicHead)+saltSize+len(ciphertext))
 
-	payload := make([]byte, 0, 7+len(salt)+len(nonce)+len(ciphertext))
-	payload = append(payload, []byte("HMCLTM1")...)
-	payload = append(payload, salt...)
-	payload = append(payload, nonce...)
-	payload = append(payload, ciphertext...)
+	offset := 0
+
+	copy(payload[offset:], magicHead)
+	offset += len(magicHead)
+
+	copy(payload[offset:], salt)
+	offset += saltSize
+
+	copy(payload[offset:], ciphertext)
 
 	return base64.RawURLEncoding.EncodeToString(payload), nil
 }
 
-func Decrypt(encoded, password string) (account.Account, error) {
-	var acc account.Account
+func (Crypto) Decrypt[T any](encoded, password string) (T, error) {
+	var zero T
 
-	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimSpace(encoded))
+	payload, err := base64.RawURLEncoding.DecodeString(encoded)
 	if err != nil {
-		return acc, fmt.Errorf("invalid encoded data: %w", err)
+		return zero, err
 	}
 
-	if len(payload) < 7+16+12+16 || !bytes.Equal(payload[:7], []byte("HMCLTM1")) {
-		return acc, fmt.Errorf("invalid HMCL token data")
+	if len(payload) < len(magicHead)+saltSize+tagSize {
+		return zero, errors.New("invalid token")
 	}
 
-	salt := payload[7:23]
-	nonce := payload[23:35]
-	ciphertext := payload[35:]
+	if string(payload[:len(magicHead)]) != magicHead {
+		return zero, fmt.Errorf("unsupported magic head %s, expected %s", string(payload[:len(magicHead)]), magicHead)
+	}
 
-	key, err := scrypt.Key([]byte(password), salt, 1<<15, 8, 1, 32)
+	offset := len(magicHead)
+
+	salt := payload[offset : offset+saltSize]
+	offset += saltSize
+
+	ciphertext := payload[offset:]
+
+	material, err := scrypt.Key(
+		[]byte(password),
+		salt,
+		1<<15,
+		8,
+		1,
+		keySize+nonceSize,
+	)
 	if err != nil {
-		return acc, err
+		return zero, err
 	}
 
-	block, err := aes.NewCipher(key)
+	block, err := aes.NewCipher(material[:keySize])
 	if err != nil {
-		return acc, err
+		return zero, err
 	}
 
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := cipher.NewGCMWithTagSize(block, tagSize)
 	if err != nil {
-		return acc, err
+		return zero, err
 	}
 
-	plain, err := gcm.Open(nil, nonce, ciphertext, nil)
+	plain, err := gcm.Open(
+		nil,
+		material[keySize:],
+		ciphertext,
+		nil,
+	)
 	if err != nil {
-		return acc, fmt.Errorf("wrong password or corrupted data")
+		return zero, errors.New("wrong password or corrupted data")
 	}
 
-	if err := json.Unmarshal(plain, &acc); err != nil {
-		return acc, fmt.Errorf("parse account data: %w", err)
+	var v T
+	if err := msgpack.Unmarshal(plain, &v); err != nil {
+		return zero, err
 	}
 
-	return acc, nil
+	return v, nil
 }

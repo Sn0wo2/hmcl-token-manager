@@ -56,14 +56,10 @@ func Load(path string) (*Store, error) {
 }
 
 func (s *Store) Import(account Account) (bool, error) {
-	if account.PrivateData.UserID == "" {
-		return false, fmt.Errorf("imported account has no userid")
-	}
-
-	for i := range s.Accounts {
-		if s.Accounts[i].PrivateData.UserID == account.PrivateData.UserID {
-			account.AccountID = s.Accounts[i].AccountID
-			s.Accounts[i] = account
+	for _, acc := range s.Accounts {
+		if acc.PrivateData.UserID == account.PrivateData.UserID {
+			account.AccountID = acc.AccountID
+			acc = account
 
 			return false, s.save()
 		}
