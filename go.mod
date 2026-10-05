@@ -5,9 +5,9 @@ go 1.27
 require (
 	charm.land/huh/v2 v2.0.3
 	github.com/Sn0wo2/caelum v0.3.0
-	github.com/Sn0wo2/hmcl-obfuscated v0.0.0-20261005085036-8f4ee9a432e4
+	github.com/Sn0wo2/hmcl-obfuscated v0.0.0-20261005160136-11dc9478ba95
 	github.com/atotto/clipboard v0.1.4
-	github.com/google/uuid v1.6.0
+	github.com/vmihailenco/msgpack/v5 v5.4.1
 	golang.org/x/crypto v0.57.0
 )
 
@@ -34,10 +34,8 @@ require (
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
-	github.com/parquet-go/bitpack v1.1.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/zerolog v1.35.1 // indirect
-	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/xo/terminfo v1.2.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect

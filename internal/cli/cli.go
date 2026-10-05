@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"charm.land/huh/v2"
@@ -14,7 +13,7 @@ import (
 )
 
 func Run(path string) error {
-	store, err := account.Load(filepath.Join(path, "private", "user-account-private-data.json"))
+	store, err := account.Load(path)
 	if err != nil {
 		return err
 	}
@@ -43,11 +42,19 @@ func Run(path string) error {
 				Run()
 		}
 
+		metadataByID := make(map[string]account.Metadata, len(store.UserAccounts.Accounts))
+		for _, metadata := range store.UserAccounts.Accounts {
+			if _, exists := metadataByID[metadata.AccountID]; !exists {
+				metadataByID[metadata.AccountID] = metadata
+			}
+		}
 		options := make([]huh.Option[int], len(store.Accounts))
 		for i, acc := range store.Accounts {
-			name := acc.PrivateData.ProfileName
-			if name == "" {
-				name = acc.PrivateData.UserID
+			name := acc.AccountID
+			if acc.PrivateData.ProfileName != nil && *acc.PrivateData.ProfileName != "" {
+				name = *acc.PrivateData.ProfileName
+			} else if metadata := metadataByID[acc.AccountID]; metadata.ProfileName != nil && *metadata.ProfileName != "" {
+				name = *metadata.ProfileName
 			}
 			options[i] = huh.NewOption(name, i)
 		}
@@ -78,7 +85,13 @@ func Run(path string) error {
 			return err
 		}
 
-		encoded, err := utils.Crypto{}.Encrypt(store.Accounts[selected], password)
+		acc := store.Accounts[selected]
+		metadata, ok := metadataByID[acc.AccountID]
+		if !ok {
+			return fmt.Errorf("account metadata not found: %s", acc.AccountID)
+		}
+		transfer := account.Transfer{Account: acc, Metadata: metadata}
+		encoded, err := utils.Encrypt(transfer, password)
 		if err != nil {
 			return err
 		}
@@ -94,7 +107,7 @@ func Run(path string) error {
 			Run()
 	case "import":
 		var encoded string
-	
+
 		if value, err := clipboard.ReadAll(); err == nil {
 			value = strings.TrimSpace(value)
 
@@ -113,13 +126,13 @@ func Run(path string) error {
 					Run(); err != nil {
 					return err
 				}
-	
+
 				if useClipboard {
 					encoded = value
 				}
 			}
 		}
-	
+
 		if encoded == "" {
 			if err := huh.NewText().
 				Title("Import account").
@@ -136,9 +149,9 @@ func Run(path string) error {
 				return err
 			}
 		}
-	
+
 		encoded = strings.TrimSpace(encoded)
-	
+
 		var password string
 		if err := huh.NewInput().
 			Title("Decryption password").
@@ -153,25 +166,31 @@ func Run(path string) error {
 			Run(); err != nil {
 			return err
 		}
-	
-		acc, err := utils.Crypto{}.Decrypt[account.Account](encoded, password)
+
+		transfer, err := utils.Decrypt[account.Transfer](encoded, password)
 		if err != nil {
 			return err
 		}
-	
-		added, err := store.Import(acc)
+
+		added, err := store.Import(transfer)
 		if err != nil {
 			return err
 		}
-	
+
 		status := "Updated"
 		if added {
 			status = "Added"
 		}
-	
+		name := transfer.Account.AccountID
+		if transfer.Account.PrivateData.ProfileName != nil && *transfer.Account.PrivateData.ProfileName != "" {
+			name = *transfer.Account.PrivateData.ProfileName
+		} else if transfer.Metadata.ProfileName != nil && *transfer.Metadata.ProfileName != "" {
+			name = *transfer.Metadata.ProfileName
+		}
+
 		return huh.NewNote().
 			Title("Import complete").
-			Description(fmt.Sprintf("%s %s\n\n%s", status, acc.PrivateData.ProfileName, path)).
+			Description(fmt.Sprintf("%s %s\n\n%s", status, name, path)).
 			Next(true).
 			NextLabel("Done").
 			Run()

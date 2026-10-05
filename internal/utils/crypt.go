@@ -4,9 +4,10 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
+	"encoding/ascii85"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/vmihailenco/msgpack/v5"
 	"golang.org/x/crypto/scrypt"
@@ -14,7 +15,7 @@ import (
 
 const (
 	// 别改长度
-	magicHead = "HMCLTM2"
+	magicHead = "HMCLTM3"
 
 	saltSize  = 16
 	keySize   = 16
@@ -22,9 +23,7 @@ const (
 	tagSize   = 12
 )
 
-type Crypto struct{}
-
-func (Crypto) Encrypt[T any](v T, password string) (string, error) {
+func Encrypt[T any](v T, password string) (string, error) {
 	plain, err := msgpack.Marshal(v)
 	if err != nil {
 		return "", err
@@ -35,14 +34,7 @@ func (Crypto) Encrypt[T any](v T, password string) (string, error) {
 		return "", err
 	}
 
-	material, err := scrypt.Key(
-		[]byte(password),
-		salt,
-		1<<15,
-		8,
-		1,
-		keySize+nonceSize,
-	)
+	material, err := scrypt.Key([]byte(password), salt, 1<<15, 8, 1, keySize+nonceSize)
 	if err != nil {
 		return "", err
 	}
@@ -57,35 +49,23 @@ func (Crypto) Encrypt[T any](v T, password string) (string, error) {
 		return "", err
 	}
 
-	ciphertext := gcm.Seal(
-		nil,
-		material[keySize:],
-		plain,
-		nil,
-	)
-
-	payload := make([]byte, len(magicHead)+saltSize+len(ciphertext))
-
-	offset := 0
-
-	copy(payload[offset:], magicHead)
-	offset += len(magicHead)
-
-	copy(payload[offset:], salt)
-	offset += saltSize
-
-	copy(payload[offset:], ciphertext)
-
-	return base64.RawURLEncoding.EncodeToString(payload), nil
+	payload := make([]byte, len(magicHead)+saltSize, len(magicHead)+saltSize+len(plain)+tagSize)
+	copy(payload, magicHead)
+	copy(payload[len(magicHead):], salt)
+	payload = gcm.Seal(payload, material[keySize:], plain, nil)
+	encoded := make([]byte, ascii85.MaxEncodedLen(len(payload)))
+	return string(encoded[:ascii85.Encode(encoded, payload)]), nil
 }
 
-func (Crypto) Decrypt[T any](encoded, password string) (T, error) {
+func Decrypt[T any](encoded, password string) (T, error) {
 	var zero T
 
-	payload, err := base64.RawURLEncoding.DecodeString(encoded)
+	payload := make([]byte, len(encoded)+3*strings.Count(encoded, "z"))
+	n, _, err := ascii85.Decode(payload, []byte(encoded), true)
 	if err != nil {
 		return zero, err
 	}
+	payload = payload[:n]
 
 	if len(payload) < len(magicHead)+saltSize+tagSize {
 		return zero, errors.New("invalid token")
@@ -95,21 +75,8 @@ func (Crypto) Decrypt[T any](encoded, password string) (T, error) {
 		return zero, fmt.Errorf("unsupported magic head %s, expected %s", string(payload[:len(magicHead)]), magicHead)
 	}
 
-	offset := len(magicHead)
-
-	salt := payload[offset : offset+saltSize]
-	offset += saltSize
-
-	ciphertext := payload[offset:]
-
-	material, err := scrypt.Key(
-		[]byte(password),
-		salt,
-		1<<15,
-		8,
-		1,
-		keySize+nonceSize,
-	)
+	salt := payload[len(magicHead) : len(magicHead)+saltSize]
+	material, err := scrypt.Key([]byte(password), salt, 1<<15, 8, 1, keySize+nonceSize)
 	if err != nil {
 		return zero, err
 	}
@@ -124,14 +91,9 @@ func (Crypto) Decrypt[T any](encoded, password string) (T, error) {
 		return zero, err
 	}
 
-	plain, err := gcm.Open(
-		nil,
-		material[keySize:],
-		ciphertext,
-		nil,
-	)
+	plain, err := gcm.Open(nil, material[keySize:], payload[len(magicHead)+saltSize:], nil)
 	if err != nil {
-		return zero, errors.New("wrong password or corrupted data")
+		return zero, err
 	}
 
 	var v T
