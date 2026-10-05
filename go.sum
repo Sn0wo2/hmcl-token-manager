@@ -1,0 +1,12 @@
+github.com/Sn0wo2/hmcl-obfuscated v0.0.0-20261005084250-6f1e9694ae76 h1:2C/KhWdPYYwO4rU5M1vkJbx4Q0kjexmTBNPg3PMNZSU=
+github.com/Sn0wo2/hmcl-obfuscated v0.0.0-20261005084250-6f1e9694ae76/go.mod h1:eP8dqKV+3UHUHLa9XjUAHjJAt7K2l4fD82LNxhNiH68=
+github.com/Sn0wo2/hmcl-obfuscated v0.0.0-20261005084920-73936b801df9 h1:wH6kfqcfyVUHqynFzVD4WpQnDsgPOCZsJX8dbtUW0I4=
+github.com/Sn0wo2/hmcl-obfuscated v0.0.0-20261005084920-73936b801df9/go.mod h1:eP8dqKV+3UHUHLa9XjUAHjJAt7K2l4fD82LNxhNiH68=
+github.com/Sn0wo2/hmcl-obfuscated v0.0.0-20261005085036-8f4ee9a432e4 h1:OHf/Ygd6fcQR9yX3LZabUYrEYFLc1ni+fBkGYBTBmfw=
+github.com/Sn0wo2/hmcl-obfuscated v0.0.0-20261005085036-8f4ee9a432e4/go.mod h1:eP8dqKV+3UHUHLa9XjUAHjJAt7K2l4fD82LNxhNiH68=
+github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
+github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
+golang.org/x/crypto v0.57.0 h1:3ZVCjf8Ggz7zneR/EHRVx68Ctf+2pmIMP2UFhh9cC6M=
+golang.org/x/crypto v0.57.0/go.mod h1:Fdz0i5U6CoizGwLda9DttjSk6qlZo25zYNtR+ycvuZA=
+golang.org/x/sys v0.48.0 h1:bbX/i/6MgT9BVLM9RT1thmxL04yeTAhbEz4SyadbXoo=
+golang.org/x/sys v0.48.0/go.mod h1:hNLxWAXmnKAxqDtdwIYC4bM9oQPEecfsnNMuSxOs3og=
