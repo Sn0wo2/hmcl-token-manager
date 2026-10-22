@@ -39,7 +39,13 @@ type Store struct {
 }
 
 func Load(path string) (*Store, error) {
-	data, err := os.ReadFile(filepath.Join(path, "private", "user-account-private-data.json"))
+	root, err := os.OpenRoot(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }()
+
+	data, err := root.ReadFile(filepath.Join("private", "user-account-private-data.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -54,10 +60,11 @@ func Load(path string) (*Store, error) {
 		return nil, err
 	}
 
-	data, err = os.ReadFile(filepath.Join(path, "config", "user-accounts.json"))
+	data, err = root.ReadFile(filepath.Join("config", "user-accounts.json"))
 	if err != nil {
 		return nil, err
 	}
+
 	var userAccounts UserAccounts
 	if err := json.Unmarshal(data, &userAccounts); err != nil {
 		return nil, err
@@ -77,6 +84,7 @@ func (s *Store) Import(data Transfer) (bool, error) {
 	} else {
 		s.Accounts = append(s.Accounts, data.Account)
 	}
+
 	i = slices.IndexFunc(s.UserAccounts.Accounts, func(acc Metadata) bool { return acc.AccountID == data.Account.AccountID })
 	if i >= 0 {
 		s.UserAccounts.Accounts[i] = data.Metadata
@@ -88,22 +96,32 @@ func (s *Store) Import(data Transfer) (bool, error) {
 }
 
 func (s *Store) save() error {
+	root, err := os.OpenRoot(s.path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+
 	metadata, err := json.Marshal(s.UserAccounts)
 	if err != nil {
 		return err
 	}
+
 	envelope, err := hmcl.Encrypt(s.Accounts, func(v any) ([]byte, error) { return json.Marshal(v) })
 	if err != nil {
 		return err
 	}
+
 	envelope.Schema, envelope.Extra = s.envelope.Schema, s.envelope.Extra
+
 	output, err := json.Marshal(envelope)
 	if err != nil {
 		return err
 	}
 
-	if err := os.WriteFile(filepath.Join(s.path, "private", "user-account-private-data.json"), output, 0600); err != nil {
+	if err := root.WriteFile(filepath.Join("private", "user-account-private-data.json"), output, 0o600); err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(s.path, "config", "user-accounts.json"), metadata, 0600)
+
+	return root.WriteFile(filepath.Join("config", "user-accounts.json"), metadata, 0o600)
 }

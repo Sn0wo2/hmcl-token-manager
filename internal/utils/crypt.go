@@ -54,6 +54,7 @@ func Encrypt[T any](v T, password string) (string, error) {
 	copy(payload[len(magicHead):], salt)
 	payload = gcm.Seal(payload, material[keySize:], plain, nil)
 	encoded := make([]byte, ascii85.MaxEncodedLen(len(payload)))
+
 	return string(encoded[:ascii85.Encode(encoded, payload)]), nil
 }
 
@@ -61,10 +62,12 @@ func Decrypt[T any](encoded, password string) (T, error) {
 	var zero T
 
 	payload := make([]byte, len(encoded)+3*strings.Count(encoded, "z"))
+
 	n, _, err := ascii85.Decode(payload, []byte(encoded), true)
 	if err != nil {
 		return zero, err
 	}
+
 	payload = payload[:n]
 
 	if len(payload) < len(magicHead)+saltSize+tagSize {
@@ -76,6 +79,7 @@ func Decrypt[T any](encoded, password string) (T, error) {
 	}
 
 	salt := payload[len(magicHead) : len(magicHead)+saltSize]
+
 	material, err := scrypt.Key([]byte(password), salt, 1<<15, 8, 1, keySize+nonceSize)
 	if err != nil {
 		return zero, err
