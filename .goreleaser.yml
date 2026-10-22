@@ -1,0 +1,86 @@
+version: 2
+
+project_name: hmcl-token-manager
+
+builds:
+  - id: hmcl-token-manager
+    main: .
+    binary: hmcl-token-manager
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    goamd64:
+      - v1
+      - v3
+    flags:
+      - -mod=readonly
+      - -trimpath
+    ldflags:
+      - -s -w
+
+dockers_v2:
+  - ids:
+      - hmcl-token-manager
+    images:
+      - ghcr.io/sn0wo2/{{ .ProjectName }}
+    tags:
+      - "v{{ .Version }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+      - "beta-latest"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.title: "{{ .ProjectName }}"
+      org.opencontainers.image.source: "https://github.com/Sn0wo2/{{ .ProjectName }}"
+      org.opencontainers.image.url: "https://github.com/Sn0wo2/{{ .ProjectName }}"
+      org.opencontainers.image.licenses: "Apache-2.0"
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .Commit }}"
+      org.opencontainers.image.created: "{{ .Date }}"
+
+snapshot:
+  version_template: "{{ .Version }}-next"
+
+changelog:
+  use: github
+  groups:
+    - title: 「Features」
+      regexp: "^.*feat(?:\\([^)]+\\))?:+.*$"
+      order: 0
+    - title: 「Bug Fixes」
+      regexp: "^.*fix(?:\\([^)]+\\))?:+.*$"
+      order: 1
+    - title: 「Performance Improvements」
+      regexp: "^.*perf(?:\\([^)]+\\))?:+.*$"
+      order: 2
+    - title: 「Documentation」
+      regexp: "^.*docs(?:\\([^)]+\\))?:+.*$"
+      order: 3
+    - title: 「Maintenance & Chores」
+      regexp: "^.*chore(?:\\([^)]+\\))?:+.*$"
+      order: 4
+    - title: 「Code Refactoring」
+      regexp: "^.*refactor(?:\\([^)]+\\))?:+.*$"
+      order: 5
+    - title: 「Tests」
+      regexp: "^.*test(?:\\([^)]+\\))?:+.*$"
+      order: 6
+    - title: 「Dependency Updates」
+      regexp: "^.*deps(?:\\([^)]+\\))?:+.*$"
+      order: 7
+    - title: 「Others」
+      order: 999
+
+release:
+  prerelease: auto
+  header: |
+    {{ if .Prerelease }}
+    > ⚠️ **WARNING: This is a pre-release version and is not recommended for production use.**
+    {{ end }}
