@@ -14,6 +14,7 @@ import (
 	"github.com/atotto/clipboard"
 )
 
+//nolint:maintidx // Keep CLI flow in main; requested inline structure.
 func main() {
 	check := func(err error) {
 		if err == nil {
@@ -61,7 +62,13 @@ func main() {
 	path, err := filepath.Abs(path)
 	check(err)
 
-	info, err := os.Stat(path)
+	if !filepath.IsAbs(path) {
+		check(fmt.Errorf("HMCL path is not absolute: %s", path))
+	}
+
+	path = filepath.Clean(path)
+
+	info, err := os.Stat(path) //nolint:gosec // HMCL_USER_HOME and platform-specific directories are intentional inputs.
 	check(err)
 
 	if !info.IsDir() {
