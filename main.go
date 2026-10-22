@@ -14,7 +14,7 @@ import (
 	"github.com/atotto/clipboard"
 )
 
-//nolint:maintidx // Keep CLI flow in main; requested inline structure.
+//nolint:maintidx
 func main() {
 	check := func(err error) {
 		if err == nil {

@@ -1,4 +1,4 @@
-BINARY_NAME ?= hmcl-token-manager
+BINARY_NAME ?= $(notdir $(CURDIR))
 
 .PHONY: lint lint-fix test build clean security ci release dry-release
 

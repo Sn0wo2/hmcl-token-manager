@@ -40,9 +40,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: ./.github/actions/setup-go
+      - uses: actions/setup-go@v7
         with:
-          cache-scope: release
+          go-version-file: go.mod
 
       - uses: docker/setup-buildx-action@v4
 
@@ -57,7 +57,6 @@ jobs:
 
       - uses: goreleaser/goreleaser-action@v7
         with:
-          version: "~> v2"
           args: release --clean ${{ inputs.snapshot && '--snapshot' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
