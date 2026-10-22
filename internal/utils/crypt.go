@@ -17,10 +17,9 @@ const (
 	// 别改长度
 	magicHead = "HMCLTM3"
 
-	saltSize  = 16
-	keySize   = 16
-	nonceSize = 12
-	tagSize   = 12
+	saltSize = 16
+	keySize  = 16
+	tagSize  = 12
 )
 
 func Encrypt[T any](v T, password string) (string, error) {
@@ -34,17 +33,7 @@ func Encrypt[T any](v T, password string) (string, error) {
 		return "", err
 	}
 
-	material, err := scrypt.Key([]byte(password), salt, 1<<15, 8, 1, keySize+nonceSize)
-	if err != nil {
-		return "", err
-	}
-
-	block, err := aes.NewCipher(material[:keySize])
-	if err != nil {
-		return "", err
-	}
-
-	gcm, err := cipher.NewGCMWithTagSize(block, tagSize)
+	gcm, nonce, err := tokenCipher(password, salt)
 	if err != nil {
 		return "", err
 	}
@@ -52,7 +41,7 @@ func Encrypt[T any](v T, password string) (string, error) {
 	payload := make([]byte, len(magicHead)+saltSize, len(magicHead)+saltSize+len(plain)+tagSize)
 	copy(payload, magicHead)
 	copy(payload[len(magicHead):], salt)
-	payload = gcm.Seal(payload, material[keySize:], plain, nil)
+	payload = gcm.Seal(payload, nonce, plain, nil)
 	encoded := make([]byte, ascii85.MaxEncodedLen(len(payload)))
 
 	return string(encoded[:ascii85.Encode(encoded, payload)]), nil
@@ -78,24 +67,12 @@ func Decrypt[T any](encoded, password string) (T, error) {
 		return zero, fmt.Errorf("unsupported magic head %s, expected %s", string(payload[:len(magicHead)]), magicHead)
 	}
 
-	salt := payload[len(magicHead) : len(magicHead)+saltSize]
-
-	material, err := scrypt.Key([]byte(password), salt, 1<<15, 8, 1, keySize+nonceSize)
+	gcm, nonce, err := tokenCipher(password, payload[len(magicHead):len(magicHead)+saltSize])
 	if err != nil {
 		return zero, err
 	}
 
-	block, err := aes.NewCipher(material[:keySize])
-	if err != nil {
-		return zero, err
-	}
-
-	gcm, err := cipher.NewGCMWithTagSize(block, tagSize)
-	if err != nil {
-		return zero, err
-	}
-
-	plain, err := gcm.Open(nil, material[keySize:], payload[len(magicHead)+saltSize:], nil)
+	plain, err := gcm.Open(nil, nonce, payload[len(magicHead)+saltSize:], nil)
 	if err != nil {
 		return zero, err
 	}
@@ -106,4 +83,20 @@ func Decrypt[T any](encoded, password string) (T, error) {
 	}
 
 	return v, nil
+}
+
+func tokenCipher(password string, salt []byte) (cipher.AEAD, []byte, error) {
+	material, err := scrypt.Key([]byte(password), salt, 1<<15, 8, 1, keySize+12)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	block, err := aes.NewCipher(material[:keySize])
+	if err != nil {
+		return nil, nil, err
+	}
+
+	gcm, err := cipher.NewGCMWithTagSize(block, tagSize)
+
+	return gcm, material[keySize:], err
 }
