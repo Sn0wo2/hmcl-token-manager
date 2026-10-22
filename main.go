@@ -29,6 +29,7 @@ func main() {
 	path := os.Getenv("HMCL_USER_HOME")
 	if strings.TrimSpace(path) == "" {
 		path = ""
+
 		switch runtime.GOOS {
 		case "windows":
 			if appdata := os.Getenv("APPDATA"); strings.TrimSpace(appdata) != "" {
@@ -62,6 +63,7 @@ func main() {
 
 	info, err := os.Stat(path)
 	check(err)
+
 	if !info.IsDir() {
 		check(fmt.Errorf("HMCL path is not a directory: %s", path))
 	}
