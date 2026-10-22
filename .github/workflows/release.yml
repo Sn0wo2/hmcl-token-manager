@@ -21,8 +21,27 @@ concurrency:
   cancel-in-progress: ${{ inputs.snapshot == true }}
 
 jobs:
-  release:
+  check-release:
     if: github.ref_type == 'tag' || inputs.snapshot
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.release.outputs.skip }}
+    steps:
+      - uses: actions/checkout@v7
+        if: github.ref_type == 'tag' && !inputs.snapshot
+        with:
+          persist-credentials: false
+
+      - name: Check for an already published release
+        id: release
+        if: github.ref_type == 'tag' && !inputs.snapshot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-release.js
+
+  release:
+    needs: check-release
+    if: needs.check-release.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Reuse CI checks for this commit
