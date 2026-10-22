@@ -92,36 +92,35 @@ func (s *Store) Import(data Transfer) (bool, error) {
 		s.UserAccounts.Accounts = append(s.UserAccounts.Accounts, data.Metadata)
 	}
 
-	return i < 0, s.save()
-}
+	added := i < 0
 
-func (s *Store) save() error {
 	root, err := os.OpenRoot(s.path)
 	if err != nil {
-		return err
+		return added, err
 	}
+
 	defer func() { _ = root.Close() }()
 
 	metadata, err := json.Marshal(s.UserAccounts)
 	if err != nil {
-		return err
+		return added, err
 	}
 
 	envelope, err := hmcl.Encrypt(s.Accounts, func(v any) ([]byte, error) { return json.Marshal(v) })
 	if err != nil {
-		return err
+		return added, err
 	}
 
 	envelope.Schema, envelope.Extra = s.envelope.Schema, s.envelope.Extra
 
 	output, err := json.Marshal(envelope)
 	if err != nil {
-		return err
+		return added, err
 	}
 
 	if err := root.WriteFile(filepath.Join("private", "user-account-private-data.json"), output, 0o600); err != nil {
-		return err
+		return added, err
 	}
 
-	return root.WriteFile(filepath.Join("config", "user-accounts.json"), metadata, 0o600)
+	return added, root.WriteFile(filepath.Join("config", "user-accounts.json"), metadata, 0o600)
 }
