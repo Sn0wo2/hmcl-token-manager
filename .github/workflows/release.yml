@@ -17,17 +17,18 @@ permissions:
   packages: write
 
 concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: false
+  group: release-${{ inputs.snapshot && 'snapshot' || 'publish' }}-${{ github.ref }}
+  cancel-in-progress: ${{ inputs.snapshot == true }}
 
 jobs:
   release:
     if: github.ref_type == 'tag' || inputs.snapshot
     runs-on: ubuntu-latest
     steps:
-      - name: Wait for CI
+      - name: Reuse CI checks for this commit
         if: github.ref_type == 'tag' && !inputs.snapshot
-        uses: lewagon/wait-on-check-action@v1
+        timeout-minutes: 15
+        uses: lewagon/wait-on-check-action@v1.9.1
         with:
           ref: ${{ github.sha }}
           check-name: Checks
@@ -39,11 +40,9 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: actions/setup-go@v7
+      - uses: ./.github/actions/setup-go
         with:
-          go-version-file: go.mod
-
-      - uses: docker/setup-qemu-action@v4
+          cache-scope: release
 
       - uses: docker/setup-buildx-action@v4
 
@@ -54,6 +53,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - uses: crazy-max/ghaction-github-runtime@v4
+
       - uses: goreleaser/goreleaser-action@v7
         with:
           version: "~> v2"
@@ -62,12 +63,15 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/upload-artifact@v7
-        if: inputs.snapshot
+        if: ${{ !cancelled() && inputs.snapshot }}
         with:
           name: release-snapshot
           path: |
             dist/*.tar.gz
             dist/*.zip
-            dist/checksums.txt
+            dist/*checksums.txt
+            dist/artifacts.json
+            dist/metadata.json
+          compression-level: 0
           retention-days: 7
           if-no-files-found: error

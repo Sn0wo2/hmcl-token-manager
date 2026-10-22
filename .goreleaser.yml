@@ -36,6 +36,9 @@ dockers_v2:
     platforms:
       - linux/amd64
       - linux/arm64
+    flags:
+      - '{{ if eq (index .Env "GITHUB_ACTIONS") "true" }}--cache-from=type=gha,version=2,scope={{ .ProjectName }}{{ end }}'
+      - '{{ if eq (index .Env "GITHUB_ACTIONS") "true" }}--cache-to=type=gha,version=2,mode=max,scope={{ .ProjectName }},ignore-error=true{{ end }}'
     labels:
       org.opencontainers.image.title: "{{ .ProjectName }}"
       org.opencontainers.image.source: "https://github.com/Sn0wo2/{{ .ProjectName }}"
